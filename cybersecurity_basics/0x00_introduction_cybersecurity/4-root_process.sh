@@ -1,2 +1,2 @@
 #!/bin/bash
-ps -u "$1" --no-headers | grep -v ' 0 0 '
+ps aux | grep "^$1" | grep -v "USER" | awk '$5 > 0' | awk '$6 > 0'
