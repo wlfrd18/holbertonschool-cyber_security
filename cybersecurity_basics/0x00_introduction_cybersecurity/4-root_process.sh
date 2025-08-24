@@ -1,3 +1,2 @@
 #!/bin/bash
-ps -aux | grep  "^$1 " | awk '$6 > 0' | awk '$5 > 0'
-
+ps -u "$1" --no-headers | grep -v ' 0 0 '
