@@ -1,0 +1,3 @@
+#!/bin/bash
+whois $1 | awk -F': *' 'BEGIN{IGNORECASE=1}function keep(k,v){if(k~/(Registrant|Admin|Tech) Street$/)v=v" ";if(k~/(Registrant|Admin|Tech) Phone Ext$/||k~/(Registrant|Admin|Tech) Fax Ext$/)k=k":";o[++n]=k","v;s[k]=1} $1~/^(Registrant|Admin|Tech)/{k=$1;v=$2;gsub(/^[ \t]+|[ \t]+$/,"",v);keep(k,v)} END{for(i=1;i<=3;i++){p=(i==1?"Registrant":(i==2?"Admin":"Tech"));if(!s[p" Phone Ext:"])o[++n]=p" Phone Ext:,";if(!s[p" Fax Ext:"])o[++n]=p" Fax Ext:,"}for(i=1;i<=n;i++)printf "%s%s",o[i],(i<n? "\n":"")}' > $1.csv
+
