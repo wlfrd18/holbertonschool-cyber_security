@@ -1,111 +1,97 @@
-#!/usr/bin/python3
-"""Find a string in the heap of a running process and replace it."""
+#!/usr/bin/env python3
+"""
+A script to find and replace a string in the heap memory of a running process.
 
-import ctypes
+Usage:
+    ./read_write_heap.py pid search_string replace_string
+
+Arguments:
+    pid: The process ID to inspect.
+    search_string: The string to search for in the heap.
+    replace_string: The string to replace it with.
+"""
+
 import os
 import sys
-
-PTRACE_ATTACH = 16
-PTRACE_DETACH = 17
-LIBC = ctypes.CDLL("libc.so.6", use_errno=True)
-
+import re
 
 def usage():
     """Print usage message and exit with status code 1."""
-    print("Usage: {} pid search_string replace_string".format(sys.argv[0]))
+    print("Usage: ./read_write_heap.py pid search_string replace_string")
     sys.exit(1)
 
-
-def ptrace(request, pid, addr, data):
-    """Call ptrace and raise OSError on failure."""
-    result = LIBC.ptrace(
-        request,
-        pid,
-        ctypes.c_void_p(addr),
-        ctypes.c_void_p(data)
-    )
-    if result == -1:
-        err = ctypes.get_errno()
-        raise OSError(err, os.strerror(err))
-    return result
-
-
-def get_heap_range(pid):
-    """Return the start and end addresses of the heap."""
-    maps_path = "/proc/{}/maps".format(pid)
-
-    with open(maps_path, "r") as maps_file:
-        for line in maps_file:
-            parts = line.split()
-            if parts and parts[-1] == "[heap]":
-                start_str, end_str = parts[0].split("-")
-                return int(start_str, 16), int(end_str, 16)
-
-    raise ValueError("Heap not found")
-
-
-def replace_in_heap(pid, search_bytes, replace_bytes):
-    """Search and replace a string in the heap of a process."""
-    start, end = get_heap_range(pid)
-    mem_path = "/proc/{}/mem".format(pid)
-
-    with open(mem_path, "rb+") as mem_file:
-        mem_file.seek(start)
-        heap_data = mem_file.read(end - start)
-
-        offset = heap_data.find(search_bytes)
-        if offset == -1:
-            raise ValueError("search_string not found")
-
-        write_addr = start + offset
-        mem_file.seek(write_addr)
-        mem_file.write(replace_bytes + b"\x00")
-
-    return write_addr
-
-
-def main():
-    """Program entry point."""
-    attached = False
-
-    if len(sys.argv) != 4:
+def read_write_heap(pid, search_string, replace_string):
+    """Find and replace a string in the heap of a process."""
+    try:
+        # Validate PID
+        pid = int(pid)
+    except ValueError:
+        print("Error: PID must be an integer.")
         usage()
 
-    pid_arg = sys.argv[1]
+    # Paths to memory maps and memory
+    maps_path = f"/proc/{pid}/maps"
+    mem_path = f"/proc/{pid}/mem"
+
+    try:
+        # Open the memory maps file
+        with open(maps_path, "r") as maps_file:
+            heap = None
+            for line in maps_file:
+                if "[heap]" in line:
+                    heap = line
+                    break
+            
+            if not heap:
+                print("Error: Could not find the heap segment.")
+                sys.exit(1)
+
+            # Extract start and end addresses of the heap
+            heap_start, heap_end = [int(x, 16) for x in heap.split()[0].split("-")]
+
+        # Open the memory file for reading and writing
+        with open(mem_path, "r+b") as mem_file:
+            # Seek to the start of the heap
+            mem_file.seek(heap_start)
+            # Read heap content
+            heap_data = mem_file.read(heap_end - heap_start)
+
+            # Search for the target string
+            search_bytes = search_string.encode()
+            replace_bytes = replace_string.encode()
+
+            if len(replace_bytes) > len(search_bytes):
+                print("Error: Replacement string must not be longer than the search string.")
+                sys.exit(1)
+
+            offset = heap_data.find(search_bytes)
+            if offset == -1:
+                print("Error: Search string not found in the heap.")
+                sys.exit(1)
+
+            # Replace the string
+            mem_file.seek(heap_start + offset)
+            mem_file.write(replace_bytes.ljust(len(search_bytes), b'\x00'))
+
+            print(f"Successfully replaced '{search_string}' with '{replace_string}' in the heap.")
+
+    except PermissionError:
+        print("Error: Permission denied. Try running as sudo.")
+        sys.exit(1)
+    except FileNotFoundError:
+        print("Error: Process not found. Is the PID correct?")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        sys.exit(1)
+
+# Main logic
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        usage()
+    
+    pid = sys.argv[1]
     search_string = sys.argv[2]
     replace_string = sys.argv[3]
 
-    if not pid_arg.isdigit():
-        usage()
-
-    try:
-        search_bytes = search_string.encode("ascii")
-        replace_bytes = replace_string.encode("ascii")
-    except UnicodeEncodeError:
-        print("Error: strings must be ASCII")
-        sys.exit(1)
-
-    pid = int(pid_arg)
-
-    try:
-        ptrace(PTRACE_ATTACH, pid, 0, 0)
-        attached = True
-        os.waitpid(pid, 0)
-
-        address = replace_in_heap(pid, search_bytes, replace_bytes)
-        print("Replaced at address 0x{:x}".format(address))
-
-    except Exception as exc:
-        print("Error: {}".format(exc))
-        sys.exit(1)
-
-    finally:
-        if attached:
-            try:
-                ptrace(PTRACE_DETACH, pid, 0, 0)
-            except Exception:
-                pass
-
-
-if __name__ == "__main__":
-    main()
+    read_write_heap(pid, search_string, replace_string)
