@@ -1,95 +1,59 @@
 #!/usr/bin/python3
 """
 Script that finds a string in the heap of a running process
-and replaces it with another string.
-
-Usage:
-    read_write_heap.py pid search_string replace_string
+and replaces it.
 """
 
 import sys
 
 
-def error():
-    """
-    Prints usage error message and exits with status code 1.
-    """
+def usage():
+    """Print usage and exit."""
     print("Usage: read_write_heap.py pid search_string replace_string")
     sys.exit(1)
 
 
-def get_heap_range(pid):
-    """
-    Retrieves heap start and end addresses from /proc/<pid>/maps.
+def main():
+    """Main function."""
+    if len(sys.argv) != 4:
+        usage()
 
-    Args:
-        pid (str): Process ID
+    pid = sys.argv[1]
+    search_string = sys.argv[2].encode()
+    replace_string = sys.argv[3].encode()
 
-    Returns:
-        tuple: (start, end) heap addresses as integers
-    """
     maps_path = "/proc/{}/maps".format(pid)
+    mem_path = "/proc/{}/mem".format(pid)
 
     try:
+        heap_start = None
+        heap_end = None
+
         with open(maps_path, "r") as maps:
             for line in maps:
                 if "[heap]" in line:
                     addresses = line.split()[0]
-                    start, end = addresses.split("-")
-                    return int(start, 16), int(end, 16)
-    except Exception:
-        error()
+                    heap_start = int(addresses.split("-")[0], 16)
+                    heap_end = int(addresses.split("-")[1], 16)
+                    break
 
-    error()
+        if heap_start is None:
+            usage()
 
-
-def replace_in_heap(pid, start, end, search, replace):
-    """
-    Searches and replaces a string inside heap memory.
-
-    Args:
-        pid (str): Process ID
-        start (int): Heap start address
-        end (int): Heap end address
-        search (bytes): String to search
-        replace (bytes): Replacement string
-    """
-    mem_path = "/proc/{}/mem".format(pid)
-
-    try:
         with open(mem_path, "rb+") as mem:
-            mem.seek(start)
-            heap = mem.read(end - start)
+            mem.seek(heap_start)
+            heap = mem.read(heap_end - heap_start)
 
-            index = heap.find(search)
+            index = heap.find(search_string)
 
             if index == -1:
-                error()
+                usage()
 
-            mem.seek(start + index)
-            mem.write(replace)
+            mem.seek(heap_start + index)
+            mem.write(replace_string)
 
     except Exception:
-        error()
-
-
-def main():
-    """
-    Main function that validates arguments and performs replacement.
-    """
-    if len(sys.argv) != 4:
-        error()
-
-    pid = sys.argv[1]
-    search = sys.argv[2].encode()
-    replace = sys.argv[3].encode()
-
-    if len(search) != len(replace):
-        error()
-
-    start, end = get_heap_range(pid)
-
-    replace_in_heap(pid, start, end, search, replace)
+        usage()
 
 
 if __name__ == "__main__":
