@@ -50,7 +50,12 @@ def main():
                 usage()
 
             mem.seek(heap_start + index)
-            mem.write(replace_string)
+
+            mem.write(
+                replace_string
+                .ljust(len(search_string), b'\x00')
+                [:len(search_string)]
+            )
 
     except Exception:
         usage()
