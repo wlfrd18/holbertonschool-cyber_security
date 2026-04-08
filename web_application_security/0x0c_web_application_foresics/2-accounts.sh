@@ -1,5 +1,5 @@
 #!/bin/bash
-tail -1000 $1 | awk '
+tail -1000 auth.log | awk '
 /Failed password for/ {
 	for (i = 1; i <= NF; i++)
 	{
