@@ -1,2 +1,9 @@
 #!/bin/bash
-grep "Accepted" auth.log | awk '{print $11}' | sort | uniq | wc -l
+grep -E 'Accepted (password|publickey) for root' auth.log | awk '
+{
+	for (i = 1; i <= NF; i++)
+	{
+		if ($i == "from")
+			print $(i + 1)
+	}
+}' | sort -u | wc -l
