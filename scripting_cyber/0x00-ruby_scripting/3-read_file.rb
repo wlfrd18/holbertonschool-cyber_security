@@ -21,4 +21,3 @@ def count_user_ids(path)
   end
 end
 
-count_user_ids("file.json")
