@@ -1,0 +1,2 @@
+# active directory - LDAP
+Active Directory acts as the central nervous system for enterprise networks, making it a primary target for attackers seeking total control. This project moves beyond individual host security to explore domain-wide compromise. You will analyze the structure of domains and forests, then exploit inherent trust in protocols like Kerberos and NTLM. By mastering techniques such as Kerberoasting, Pass-the-Hash, and Golden Ticket attacks, you will understand how a single weak configuration can lead to full infrastructure dominance
